@@ -1,0 +1,47 @@
+syntax = "proto3";
+
+package p2p;
+
+option go_package = "voltera-p2p-go/proto";
+
+// Servicio del Notificador de Métricas P2P
+service Notificador {
+  rpc EnviarNotificacion (MatchRequest) returns (NotificacionResponse);
+}
+
+// Servicio del Matching Engine P2P
+service MatchingEngine {
+  rpc CrearOrden (OrdenEnergyRequest) returns (OrdenEnergyResponse);
+}
+
+message OrdenEnergyRequest {
+  string orden_id = 1;
+  string prosumidor_id = 2;
+  string comunidad_id = 3;
+  string tipo = 4; // "OFERTA" (venta) o "DEMANDA" (compra)
+  double kwh = 5;
+  double precio_kwh = 6;
+  int64 ts_recepcion = 7;
+}
+
+message OrdenEnergyResponse {
+  bool exito = 1;
+  string mensaje = 2;
+  string match_id = 3;
+}
+
+message MatchRequest {
+  string match_id = 1;
+  string oferta_id = 2;
+  string demanda_id = 3;
+  double kwh_transados = 4;
+  double precio_final_kwh = 5;
+  int64 ts_engine_match = 6;
+  int64 ts_api_recepcion = 7;
+  int64 ts_api_salida = 8;
+}
+
+message NotificacionResponse {
+  bool exito = 1;
+  string mensaje = 2;
+}

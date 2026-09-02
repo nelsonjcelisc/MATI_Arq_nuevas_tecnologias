@@ -1,0 +1,68 @@
+services:
+  notificaciones:
+    build:
+      context: .
+      dockerfile: notificador/Dockerfile
+    container_name: notificador_voltera
+    ports:
+      - "50051:50051"
+      - "2112:2112"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - voltera-p2p-net
+
+  matching-engine:
+    build:
+      context: .
+      dockerfile: matching-engine/Dockerfile
+    container_name: matching_engine_voltera
+    ports:
+      - "8080:8080"
+    environment:
+      - NOTIFICADOR_HOST=notificaciones:50051
+    depends_on:
+      - notificaciones
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    networks:
+      - voltera-p2p-net
+
+  api-handler:
+    build:
+      context: .
+      dockerfile: api-handler/Dockerfile
+    container_name: api_handler_voltera
+    ports:
+      - "8000:8000"
+    environment:
+      - MATCHING_ENGINE_HOST=matching-engine:8080
+    depends_on:
+      - matching-engine
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - voltera-p2p-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus_voltera
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - voltera-p2p-net
+
+networks:
+  voltera-p2p-net:
+    driver: bridge
