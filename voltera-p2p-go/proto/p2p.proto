@@ -4,7 +4,12 @@ package p2p;
 
 option go_package = "voltera-p2p-go/proto";
 
-// Servicio del Notificador de Métricas P2P
+// Servicio Validador de Contratos en Caliente (Zero-Trust & Sanitize)
+service ContractValidator {
+  rpc ValidarContrato (OrdenEnergyRequest) returns (ValidacionResponse);
+}
+
+// Servicio del Notificador de Métricas P2P & Dispatcher Bidireccional
 service Notificador {
   rpc EnviarNotificacion (MatchRequest) returns (NotificacionResponse);
 }
@@ -22,6 +27,13 @@ message OrdenEnergyRequest {
   double kwh = 5;
   double precio_kwh = 6;
   int64 ts_recepcion = 7;
+  string firma_digital = 8; // Token / Firma Zero-Trust
+}
+
+message ValidacionResponse {
+  bool es_valido = 1;
+  string codigo_error = 2;
+  string mensaje = 3;
 }
 
 message OrdenEnergyResponse {
@@ -34,11 +46,13 @@ message MatchRequest {
   string match_id = 1;
   string oferta_id = 2;
   string demanda_id = 3;
-  double kwh_transados = 4;
-  double precio_final_kwh = 5;
-  int64 ts_engine_match = 6;
-  int64 ts_api_recepcion = 7;
-  int64 ts_api_salida = 8;
+  string prosumidor_oferente_id = 4;
+  string prosumidor_demandante_id = 5;
+  double kwh_transados = 6;
+  double precio_final_kwh = 7;
+  int64 ts_engine_match = 8;
+  int64 ts_api_recepcion = 9;
+  int64 ts_api_salida = 10;
 }
 
 message NotificacionResponse {

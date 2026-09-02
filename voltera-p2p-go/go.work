@@ -1,0 +1,9 @@
+go 1.23.0
+
+use (
+	./api-handler
+	./contract-validator
+	./matching-engine
+	./notificador
+	./proto
+)

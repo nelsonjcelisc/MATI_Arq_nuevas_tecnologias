@@ -5,3 +5,7 @@ scrape_configs:
   - job_name: 'notificador_voltera_p2p'
     static_configs:
       - targets: ['notificaciones:2112']
+
+  - job_name: 'contract_validator_voltera_p2p'
+    static_configs:
+      - targets: ['contract-validator:2113']

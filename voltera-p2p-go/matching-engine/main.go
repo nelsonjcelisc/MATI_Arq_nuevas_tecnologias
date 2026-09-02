@@ -16,16 +16,6 @@ import (
 	"google.golang.org/grpc/reflection"
 )
 
-type Orden struct {
-	ID           string
-	ProsumidorID string
-	ComunidadID  string
-	Tipo         string
-	Kwh          double
-	PrecioKwh    double
-	TsRecepcion  int64
-}
-
 type OrderBook struct {
 	mu       sync.Mutex
 	ofertas  []*pb.OrdenEnergyRequest // Venta
@@ -51,8 +41,8 @@ type server struct {
 }
 
 func (s *server) CrearOrden(ctx context.Context, in *pb.OrdenEnergyRequest) (*pb.OrdenEnergyResponse, error) {
-	log.Printf("[MATCHING ENGINE] Orden Recibida: ID=%s | Tipo=%s | kWh=%.2f | Precio=$%.2f | Comunidad=%s",
-		in.OrdenId, in.Tipo, in.Kwh, in.PrecioKwh, in.ComunidadId)
+	log.Printf("[MATCHING ENGINE] Orden Recibida: ID=%s | Tipo=%s | kWh=%.2f | Precio=$%.2f | Comunidad=%s | Firma=%s",
+		in.OrdenId, in.Tipo, in.Kwh, in.PrecioKwh, in.ComunidadId, in.FirmaDigital)
 
 	book.mu.Lock()
 	defer book.mu.Unlock()
@@ -60,34 +50,31 @@ func (s *server) CrearOrden(ctx context.Context, in *pb.OrdenEnergyRequest) (*pb
 	matched := false
 	var matchedID string
 
-	if in.Tipo == "OFERTA" { // Es Venta de Energía
+	if in.Tipo == "OFERTA" { // Venta de Energía
 		for i, d := range book.demandas {
-			// Regla de Emparejamiento P2P: Misma comunidad (o compatible) y tarifa aceptable
 			if d.PrecioKwh >= in.PrecioKwh && (d.ComunidadId == in.ComunidadId || in.ComunidadId == "GLOBAL") {
 				matched = true
 				matchedID = generateMatchID()
 				kwhTransados := min(in.Kwh, d.Kwh)
 				precioFinal := (in.PrecioKwh + d.PrecioKwh) / 2.0
 
-				log.Printf("[MATCHING ENGINE] MATCH ENCONTRADO! MatchID=%s | Oferta=%s | Demanda=%s | kWh=%.2f",
-					matchedID, in.OrdenId, d.OrdenId, kwhTransados)
+				log.Printf("[MATCHING ENGINE] MATCH ENCONTRADO! MatchID=%s | Oferente=%s | Demandante=%s | kWh=%.2f",
+					matchedID, in.ProsumidorId, d.ProsumidorId, kwhTransados)
 
-				// Consumir o reducir ordenes
 				if d.Kwh <= in.Kwh {
 					book.demandas = append(book.demandas[:i], book.demandas[i+1:]...)
 				} else {
 					d.Kwh -= kwhTransados
 				}
 
-				// Enviar notificación asíncrona vía gRPC
-				go notificarMatch(matchedID, in.OrdenId, d.OrdenId, kwhTransados, precioFinal, in.TsRecepcion)
+				go notificarMatch(matchedID, in.OrdenId, d.OrdenId, in.ProsumidorId, d.ProsumidorId, kwhTransados, precioFinal, in.TsRecepcion)
 				break
 			}
 		}
 		if !matched {
 			book.ofertas = append(book.ofertas, in)
 		}
-	} else { // Es Demanda de Energía
+	} else { // Demanda de Energía
 		for i, o := range book.ofertas {
 			if in.PrecioKwh >= o.PrecioKwh && (o.ComunidadId == in.ComunidadId || in.ComunidadId == "GLOBAL") {
 				matched = true
@@ -95,8 +82,8 @@ func (s *server) CrearOrden(ctx context.Context, in *pb.OrdenEnergyRequest) (*pb
 				kwhTransados := min(in.Kwh, o.Kwh)
 				precioFinal := (in.PrecioKwh + o.PrecioKwh) / 2.0
 
-				log.Printf("[MATCHING ENGINE] MATCH ENCONTRADO! MatchID=%s | Demanda=%s | Oferta=%s | kWh=%.2f",
-					matchedID, in.OrdenId, o.OrdenId, kwhTransados)
+				log.Printf("[MATCHING ENGINE] MATCH ENCONTRADO! MatchID=%s | Oferente=%s | Demandante=%s | kWh=%.2f",
+					matchedID, o.ProsumidorId, in.ProsumidorId, kwhTransados)
 
 				if o.Kwh <= in.Kwh {
 					book.ofertas = append(book.ofertas[:i], book.ofertas[i+1:]...)
@@ -104,7 +91,7 @@ func (s *server) CrearOrden(ctx context.Context, in *pb.OrdenEnergyRequest) (*pb
 					o.Kwh -= kwhTransados
 				}
 
-				go notificarMatch(matchedID, o.OrdenId, in.OrdenId, kwhTransados, precioFinal, in.TsRecepcion)
+				go notificarMatch(matchedID, o.OrdenId, in.OrdenId, o.ProsumidorId, in.ProsumidorId, kwhTransados, precioFinal, in.TsRecepcion)
 				break
 			}
 		}
@@ -132,7 +119,7 @@ func min(a, b float64) float64 {
 	return b
 }
 
-func notificarMatch(matchID, ofertaID, demandaID string, kwh, precio float64, tsApiRecepcion int64) {
+func notificarMatch(matchID, ofertaID, demandaID, oferenteID, demandanteID string, kwh, precio float64, tsApiRecepcion int64) {
 	if notifClient == nil {
 		return
 	}
@@ -140,14 +127,16 @@ func notificarMatch(matchID, ofertaID, demandaID string, kwh, precio float64, ts
 	tsApiSalida := time.Now().UnixNano()
 
 	req := &pb.MatchRequest{
-		MatchId:        matchID,
-		OfertaId:       ofertaID,
-		DemandaId:      demandaID,
-		KwhTransados:   kwh,
-		PrecioFinalKwh: precio,
-		TsEngineMatch:  tsEngineMatch,
-		TsApiRecepcion: tsApiRecepcion,
-		TsApiSalida:    tsApiSalida,
+		MatchId:                matchID,
+		OfertaId:               ofertaID,
+		DemandaId:              demandaID,
+		ProsumidorOferenteId:   oferenteID,
+		ProsumidorDemandanteId: demandanteID,
+		KwhTransados:           kwh,
+		PrecioFinalKwh:         precio,
+		TsEngineMatch:          tsEngineMatch,
+		TsApiRecepcion:         tsApiRecepcion,
+		TsApiSalida:            tsApiSalida,
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -165,7 +154,6 @@ func main() {
 		notifHost = "notificaciones:50051"
 	}
 
-	// Conectar gRPC con el microservicio notificador
 	conn, err := grpc.NewClient(notifHost, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Printf("[MATCHING ENGINE] Advertencia: No se pudo conectar al Notificador (%v)", err)

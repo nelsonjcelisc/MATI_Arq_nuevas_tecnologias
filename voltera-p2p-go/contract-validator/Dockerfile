@@ -9,11 +9,11 @@ COPY matching-engine/ ./matching-engine/
 COPY notificador/ ./notificador/
 COPY contract-validator/ ./contract-validator/
 
-WORKDIR /app/matching-engine
-RUN go build -o matching-engine-go main.go
+WORKDIR /app/contract-validator
+RUN go build -o contract-validator-go main.go
 
 FROM alpine:latest
 WORKDIR /root/
-COPY --from=builder /app/matching-engine/matching-engine-go .
-EXPOSE 8080
-CMD ["./matching-engine-go"]
+COPY --from=builder /app/contract-validator/contract-validator-go .
+EXPOSE 50052 2113
+CMD ["./contract-validator-go"]

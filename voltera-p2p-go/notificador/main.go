@@ -21,6 +21,16 @@ var (
 		Help: "Número total de emparejamientos P2P procesados",
 	})
 
+	notificacionesOferenteTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "voltera_p2p_notificaciones_oferente_total",
+		Help: "Total de notificaciones enviadas a prosumidores oferentes (venta)",
+	})
+
+	notificacionesDemandanteTotal = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "voltera_p2p_notificaciones_demandante_total",
+		Help: "Total de notificaciones enviadas a prosumidores demandantes (compra)",
+	})
+
 	kwhTransadosTotal = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "voltera_p2p_kwh_transados_total",
 		Help: "Total de kWh transados en el mercado P2P",
@@ -47,6 +57,8 @@ var (
 
 func init() {
 	prometheus.MustRegister(matchesProcessed)
+	prometheus.MustRegister(notificacionesOferenteTotal)
+	prometheus.MustRegister(notificacionesDemandanteTotal)
 	prometheus.MustRegister(kwhTransadosTotal)
 	prometheus.MustRegister(latenciaMatchingHistogram)
 	prometheus.MustRegister(latenciaRedHistogram)
@@ -75,12 +87,14 @@ func (s *server) EnviarNotificacion(ctx context.Context, in *pb.MatchRequest) (*
 	}
 
 	matchesProcessed.Inc()
+	notificacionesOferenteTotal.Inc()
+	notificacionesDemandanteTotal.Inc()
 	kwhTransadosTotal.Add(in.KwhTransados)
 
-	log.Printf("[NOTIFICADOR] Match ID: %s | kWh: %.2f | Precio: $%.2f | Engine: %.2fms | Red: %.2fms | E2E: %.2fms",
-		in.MatchId, in.KwhTransados, in.PrecioFinalKwh, diffMatching*1000, diffRed*1000, diffE2E*1000)
+	log.Printf("[NOTIFICADOR BIDIRECCIONAL] Match ID: %s | Oferente (%s) -> Demandante (%s) | kWh: %.2f | Precio: $%.2f | Engine: %.2fms | Red: %.2fms | E2E: %.2fms",
+		in.MatchId, in.ProsumidorOferenteId, in.ProsumidorDemandanteId, in.KwhTransados, in.PrecioFinalKwh, diffMatching*1000, diffRed*1000, diffE2E*1000)
 
-	return &pb.NotificacionResponse{Exito: true, Mensaje: "Notificación P2P procesada exitosamente"}, nil
+	return &pb.NotificacionResponse{Exito: true, Mensaje: "Notificación bidireccional P2P enviada exitosamente a ambos prosumidores"}, nil
 }
 
 func main() {
@@ -99,7 +113,7 @@ func main() {
 	pb.RegisterNotificadorServer(s, &server{})
 	reflection.Register(s)
 
-	log.Println("[NOTIFICADOR] Servidor gRPC escuchando en :50051")
+	log.Println("[NOTIFICADOR BIDIRECCIONAL] Servidor gRPC escuchando en :50051")
 	if err := s.Serve(lis); err != nil {
 		log.Fatalf("Error al servir gRPC: %v", err)
 	}

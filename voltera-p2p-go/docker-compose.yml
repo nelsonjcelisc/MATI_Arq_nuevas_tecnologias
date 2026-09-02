@@ -15,6 +15,22 @@ services:
     networks:
       - voltera-p2p-net
 
+  contract-validator:
+    build:
+      context: .
+      dockerfile: contract-validator/Dockerfile
+    container_name: contract_validator_voltera
+    ports:
+      - "50052:50052"
+      - "2113:2113"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - voltera-p2p-net
+
   matching-engine:
     build:
       context: .
@@ -43,8 +59,10 @@ services:
       - "8000:8000"
     environment:
       - MATCHING_ENGINE_HOST=matching-engine:8080
+      - CONTRACT_VALIDATOR_HOST=contract-validator:50052
     depends_on:
       - matching-engine
+      - contract-validator
     deploy:
       resources:
         limits:
