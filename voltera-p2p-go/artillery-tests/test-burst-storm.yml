@@ -1,0 +1,23 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - name: "Sustained Baseline (Hora Normal)"
+      duration: 10
+      arrivalRate: 20
+    - name: "Solar Peak Burst Storm (10x Spike - 200 req/s)"
+      duration: 15
+      arrivalRate: 200
+    - name: "Recovery Baseline"
+      duration: 5
+      arrivalRate: 20
+  processor: "./processor.js"
+
+scenarios:
+  - name: "Voltera Event Storm & Solar Peak Test"
+    flow:
+      - function: "initPoisson"
+      - loop:
+          - function: "configurarOleadaP2P"
+          - post:
+              url: "/api/orden"
+              json: "{{ payload }}"
