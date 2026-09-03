@@ -10,28 +10,28 @@ La arquitectura sigue una topología desacoplada orientada a eventos e ingesta b
 
 ```mermaid
 graph TD
-    subgraph Clientes & Pruebas
-        ART[Artillery Load Tester / Prosumidores]
+    subgraph Clientes_Pruebas["Clientes y Pruebas"]
+        ART["Artillery Load Tester / Prosumidores"]
     end
 
-    subgraph Perímetro de Ingesta & Balanceo
-        NGX["Nginx Load Balancer (:8000)<br/><i>Least-Conn Strategy</i>"]
+    subgraph Perimetro_Ingesta["Perímetro de Ingesta y Balanceo"]
+        NGX["Nginx Load Balancer (:8000)<br/>Least-Conn Strategy"]
     end
 
-    subgraph Cluster API Gateway Elastic (Go)
-        API1[API Handler Node 1]
-        API2[API Handler Node 2]
-        API3[API Handler Node 3]
+    subgraph Cluster_API_Gateway["Cluster API Gateway Elastic (Go)"]
+        API1["API Handler Node 1"]
+        API2["API Handler Node 2"]
+        API3["API Handler Node 3"]
     end
 
-    subgraph Servicios Internos gRPC (Go)
-        VAL["contract-validator (:50052)<br/><i>Zero-Trust Contract Engine</i>"]
-        ENG["matching-engine (:8080)<br/><i>OrderBook & Price-Time Priority</i>"]
-        NOT["notificaciones (:50051)<br/><i>Bidirectional Dispatcher</i>"]
+    subgraph Servicios_gRPC["Servicios Internos gRPC (Go)"]
+        VAL["contract-validator (:50052)<br/>Zero-Trust Contract Engine"]
+        ENG["matching-engine (:8080)<br/>OrderBook & Price-Time Priority"]
+        NOT["notificaciones (:50051)<br/>Bidirectional Dispatcher"]
     end
 
-    subgraph Monitoreo & Observabilidad
-        PROM["Prometheus Server (:9090)<br/><i>Metrics & Telemetry</i>"]
+    subgraph Monitoreo_Observabilidad["Monitoreo y Observabilidad"]
+        PROM["Prometheus Server (:9090)<br/>Metrics & Telemetry"]
     end
 
     %% Flujos de Red
@@ -49,7 +49,7 @@ graph TD
     API3 -->|2. gRPC CrearOrden (Si es válido)| ENG
 
     ENG -->|3. Goroutine gRPC NotificarMatch| NOT
-    NOT -->|Notifica Oferente & Demandante| ART
+    NOT -->|Notifica Oferente y Demandante| ART
 
     %% Telemetría Prometheus
     NOT -.->|Metrics :2112| PROM
