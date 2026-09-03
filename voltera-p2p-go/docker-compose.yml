@@ -1,0 +1,95 @@
+services:
+  nginx-lb:
+    image: nginx:alpine
+    container_name: nginx_voltera_lb
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - api-handler
+    networks:
+      - voltera-p2p-net
+
+  notificaciones:
+    build:
+      context: .
+      dockerfile: notificador/Dockerfile
+    container_name: notificador_voltera
+    ports:
+      - "50051:50051"
+      - "2112:2112"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - voltera-p2p-net
+
+  contract-validator:
+    build:
+      context: .
+      dockerfile: contract-validator/Dockerfile
+    container_name: contract_validator_voltera
+    ports:
+      - "50052:50052"
+      - "2113:2113"
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - voltera-p2p-net
+
+  matching-engine:
+    build:
+      context: .
+      dockerfile: matching-engine/Dockerfile
+    container_name: matching_engine_voltera
+    ports:
+      - "8080:8080"
+    environment:
+      - NOTIFICADOR_HOST=notificaciones:50051
+    depends_on:
+      - notificaciones
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 256M
+    networks:
+      - voltera-p2p-net
+
+  api-handler:
+    build:
+      context: .
+      dockerfile: api-handler/Dockerfile
+    environment:
+      - MATCHING_ENGINE_HOST=matching-engine:8080
+      - CONTRACT_VALIDATOR_HOST=contract-validator:50052
+    depends_on:
+      - matching-engine
+      - contract-validator
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 128M
+    networks:
+      - voltera-p2p-net
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus_voltera
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - voltera-p2p-net
+
+networks:
+  voltera-p2p-net:
+    driver: bridge

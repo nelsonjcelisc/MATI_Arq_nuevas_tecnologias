@@ -1,0 +1,16 @@
+config:
+  target: "http://localhost:8000"
+  phases:
+    - duration: 30
+      arrivalCount: 20
+  processor: "./processor.js"
+
+scenarios:
+  - name: "P2P Solar Matching Engine Poisson Test"
+    flow:
+      - function: "initPoisson"
+      - loop:
+          - function: "configurarOleadaP2P"
+          - post:
+              url: "/api/orden"
+              json: "{{ payload }}"

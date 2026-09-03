@@ -1,0 +1,12 @@
+{
+  "name": "voltera-artillery-tests",
+  "version": "1.0.0",
+  "description": "Pruebas estocásticas de carga P2P Voltera con Artillery",
+  "main": "processor.js",
+  "scripts": {
+    "test": "npx artillery run test-p2p.yml"
+  },
+  "dependencies": {
+    "artillery": "^2.0.0-sub7"
+  }
+}
