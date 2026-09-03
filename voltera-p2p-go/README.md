@@ -86,6 +86,46 @@ graph TD
 
 ---
 
+## 📈 Catálogo de Métricas Expuestas en Prometheus
+
+Los microservicios instrumentan y exponen métricas nativas de Prometheus a través de los endpoints de telemetría `:2112` (`notificador`) y `:2113` (`contract-validator`).
+
+| Nombre de la Métrica | Tipo | Descripción y Propósito de Negocio / Técnico |
+| :--- | :---: | :--- |
+| `voltera_p2p_matches_procesados_total` | `Counter` | Número total de emparejamientos P2P concretados con éxito por el algoritmo. |
+| `voltera_p2p_notificaciones_oferente_total` | `Counter` | Total de notificaciones despachadas al prosumidor **Oferente** (vendedor de energía). |
+| `voltera_p2p_notificaciones_demandante_total` | `Counter` | Total de notificaciones despachadas al prosumidor **Demandante** (comprador de energía). |
+| `voltera_p2p_kwh_transados_total` | `Counter` | Acumulado total de kilovatios-hora (kWh) solares comercializados en la red. |
+| `voltera_p2p_contratos_invalidos_total` | `Counter` | **Métrica de Seguridad / Zero-Trust:** Registra contratos rechazados por firmas alteradas o valores energéticos anómalos. |
+| `voltera_p2p_latencia_matching_segundos` | `Histogram` | Distribución del tiempo (segundos) dedicado exclusivamente a resolver la prioridad precio-tiempo en el OrderBook. |
+| `voltera_p2p_latencia_red_grpc_segundos` | `Histogram` | Tiempo de tránsito y serialización de mensajes en la red interna gRPC. |
+| `voltera_p2p_latencia_e2e_segundos` | `Histogram` | Latencia End-to-End completa desde que entra la orden al Gateway hasta que se notifica a las partes. |
+
+---
+
+## 📊 Consultas Frecuentes en PromQL
+
+Accede a la interfaz de Prometheus en `http://localhost:9090` para graficar:
+
+* **Latencia $p95$ de Emparejamiento (ASR 1):**
+  ```promql
+  histogram_quantile(0.95, sum(rate(voltera_p2p_latencia_matching_segundos_bucket[1m])) by (le)) * 1000
+  ```
+* **Throughput de Emparejamientos por Segundo:**
+  ```promql
+  rate(voltera_p2p_matches_procesados_total[1m])
+  ```
+* **Alertas de Ciberseguridad / Contratos Inválidos Rechazados (ASR 2):**
+  ```promql
+  sum(voltera_p2p_contratos_invalidos_total)
+  ```
+* **Total de Energía Comercializada en la Red (kWh):**
+  ```promql
+  voltera_p2p_kwh_transados_total
+  ```
+
+---
+
 ## 🛠️ Estructura de Microservicios
 
 El repositorio contiene los siguientes módulos desarrollados en **Go (golang:1.23)**:
@@ -118,22 +158,3 @@ docker compose up -d --scale api-handler=3 --build
 # 3. Verificar estado de los contenedores
 docker ps
 ```
-
----
-
-## 📊 Monitoreo y Consultas PromQL en Prometheus
-
-Accede a la interfaz de Prometheus en `http://localhost:9090`.
-
-* **Latencia $p95$ de Emparejamiento:**
-  ```promql
-  histogram_quantile(0.95, sum(rate(voltera_p2p_latencia_matching_segundos_bucket[1m])) by (le)) * 1000
-  ```
-* **Throughput de Emparejamientos por Segundo:**
-  ```promql
-  rate(voltera_p2p_matches_procesados_total[1m])
-  ```
-* **Contratos Anómalos/Invalidados Descartados:**
-  ```promql
-  sum(voltera_p2p_contratos_invalidos_total)
-  ```
