@@ -60,21 +60,29 @@ graph TD
 
 ## 🎯 Atributos de Calidad y Escenarios ASR (Architectural Significant Requirements)
 
-### 🚀 ASR 1: Desempeño y Tolerancia a Picos de Emparejamiento (Performance & Scalability)
-* **Fuente del Estímulo:** Prosumidores solares (residenciales y comerciales) durante picos de generación fotovoltaica o demanda.
-* **Estímulo:** Ráfaga masiva de órdenes de emparejamiento de energía P2P que multiplica por $10\times$ el volumen habitual, alcanzando hasta **2 millones de solicitudes por minuto**.
-* **Artefacto:** Cluster de API Gateways (`api-handler`) + Nginx LB + `matching-engine` en Go.
-* **Entorno:** Operación normal del sistema sometido a picos extremos de tráfico.
-* **Respuesta:** Procesar la ingesta REST, validar contratos en caliente, ejecutar el calce en el OrderBook y emitir las notificaciones bidireccionales.
-* **Medida de Respuesta:** Latencia End-to-End en el **percentil 95 ($p95$) $\le 300\text{ ms}$** garantizando una tasa de procesamiento sin pérdida de datos.
+### 🚀 ASR 1: Desempeño y Latencia en Emparejamiento P2P (Performance)
+* **Fuente del Estímulo:** Prosumidores solares (paneles solares residenciales / comerciales).
+* **Estímulo:** Envío continuo de órdenes de compra/venta de energía solar.
+* **Artefacto:** Cluster de API Gateways + `matching-engine` en Go.
+* **Entorno:** Operación normal con carga estocástica distribuidas bajo procesos de Poisson.
+* **Respuesta:** Validar contrato, procesar orden en el OrderBook, realizar match y notificar a ambas partes.
+* **Medida de Respuesta:** Latencia en percentil 95 ($p95$) $\le 300\text{ ms}$ desde la ingesta REST hasta la notificación final gRPC.
 
-### 🛡️ ASR 2: Ciberseguridad y Detección de Contratos Maliciosos (Security & Grid Safety)
-* **Fuente del Estímulo:** Actor o dispositivo malicioso intentando inyectar contratos energéticos corruptos o manipulados en la red eléctrica.
-* **Estímulo:** Solicitud HTTP/gRPC con firmas digitales alteradas (`INVALID_SIGNATURE`), valores de energía anómalos ($\le 0$ kWh o $> 500$ kWh) o tarifas no autorizadas.
-* **Artefacto:** Microservicio perimetral `contract-validator` en Go Docker (`:50052`).
+### 🛡️ ASR 2: Ciberseguridad y Validación Zero-Trust de Contratos (Security & Grid Safety)
+* **Fuente del Estímulo:** Dispositivo o actor malicioso intentando inyectar contratos manipulados.
+* **Estímulo:** Solicitud con firmas digitales corruptas (`INVALID_SIGNATURE`), valores energéticos anómalos ($\le 0$ kWh o $> 500$ kWh) o tarifas fuera de rango regulado.
+* **Artefacto:** Microservicio independiente `contract-validator` en Docker (`:50052`).
 * **Entorno:** Operación normal de ingesta en caliente.
-* **Respuesta:** Detectar la firma o parámetro alterado, descartar la orden inmediatamente antes de ingresar al OrderBook del motor de emparejamiento e incrementar las métricas de alerta.
-* **Medida de Respuesta:** Tiempo de identificación y rechazo **$\le 200\text{ ms}$** desde la recepción de la solicitud en la frontera, retornando un código `HTTP 400 Bad Request` y registrando el incidente en Prometheus (`voltera_p2p_contratos_invalidos_total`).
+* **Respuesta:** Descarte inmediato de la orden antes de tocar la memoria o el OrderBook del motor.
+* **Medida de Respuesta:** 100% de los contratos anómalos o alterados son rechazados en $< 1\text{ ms}$ retornando `HTTP 400 Bad Request` y registrando el incidente en las métricas de Prometheus (`voltera_p2p_contratos_invalidos_total`).
+
+### ⚡ ASR 3: Escalabilidad y Resiliencia ante Tormentas de Eventos (Scalability)
+* **Fuente del Estímulo:** Ráfaga pico solar (Event Storm) en horas de máxima radiación solar.
+* **Estímulo:** Pico de tráfico estocástico multiplicando por $10\times$ la ingesta habitual (hasta 800 req/segundo).
+* **Artefacto:** Cluster elástico de `api-handler` de Go escalado horizontalmente detrás de Nginx LB.
+* **Entorno:** Pico de carga extremo.
+* **Respuesta:** Nginx distribuye la carga entre réplicas elásticas manteniendo la disponibilidad del sistema sin caídas del motor.
+* **Medida de Respuesta:** Tasa de disponibilidad del 100% sin perdida de estado en el libro de ofertas.
 
 ---
 
@@ -88,10 +96,10 @@ Los microservicios instrumentan y exponen métricas nativas de Prometheus a trav
 | `voltera_p2p_notificaciones_oferente_total` | `Counter` | Total de notificaciones despachadas al prosumidor **Oferente** (vendedor de energía). |
 | `voltera_p2p_notificaciones_demandante_total` | `Counter` | Total de notificaciones despachadas al prosumidor **Demandante** (comprador de energía). |
 | `voltera_p2p_kwh_transados_total` | `Counter` | Acumulado total de kilovatios-hora (kWh) solares comercializados en la red. |
-| `voltera_p2p_contratos_invalidos_total` | `Counter` | **Métrica de Ciberseguridad (ASR 2 / Zero-Trust):** Registra contratos rechazados por firmas alteradas o valores energéticos anómalos. |
+| `voltera_p2p_contratos_invalidos_total` | `Counter` | **Métrica de Seguridad / Zero-Trust:** Registra contratos rechazados por firmas alteradas o valores energéticos anómalos. |
 | `voltera_p2p_latencia_matching_segundos` | `Histogram` | Distribución del tiempo (segundos) dedicado exclusivamente a resolver la prioridad precio-tiempo en el OrderBook. |
 | `voltera_p2p_latencia_red_grpc_segundos` | `Histogram` | Tiempo de tránsito y serialización de mensajes en la red interna gRPC. |
-| `voltera_p2p_latencia_e2e_segundos` | `Histogram` | Latencia End-to-End completa desde la ingesta REST hasta la notificación bidireccional. |
+| `voltera_p2p_latencia_e2e_segundos` | `Histogram` | Latencia End-to-End completa desde que entra la orden al Gateway hasta que se notifica a las partes. |
 
 ---
 
