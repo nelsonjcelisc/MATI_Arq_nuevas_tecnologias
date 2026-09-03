@@ -14,7 +14,7 @@ graph TD
         ART["Artillery Load Tester / Prosumidores"]
     end
 
-    subgraph Perimetro_Ingesta["Perímetro de Ingesta y Balanceo"]
+    subgraph Perimetro_Ingesta["Perimetro de Ingesta y Balanceo"]
         NGX["Nginx Load Balancer (:8000)<br/>Least-Conn Strategy"]
     end
 
@@ -35,25 +35,25 @@ graph TD
     end
 
     %% Flujos de Red
-    ART -->|HTTP POST /api/v1/ordenes| NGX
-    NGX -->|Round-Robin / Least-Conn| API1
-    NGX -->|Round-Robin / Least-Conn| API2
-    NGX -->|Round-Robin / Least-Conn| API3
+    ART --> NGX
+    NGX --> API1
+    NGX --> API2
+    NGX --> API3
 
-    API1 -->|1. gRPC ValidarContrato| VAL
-    API2 -->|1. gRPC ValidarContrato| VAL
-    API3 -->|1. gRPC ValidarContrato| VAL
+    API1 -->|ValidarContrato| VAL
+    API2 -->|ValidarContrato| VAL
+    API3 -->|ValidarContrato| VAL
 
-    API1 -->|2. gRPC CrearOrden (Si es válido)| ENG
-    API2 -->|2. gRPC CrearOrden (Si es válido)| ENG
-    API3 -->|2. gRPC CrearOrden (Si es válido)| ENG
+    API1 -->|CrearOrden| ENG
+    API2 -->|CrearOrden| ENG
+    API3 -->|CrearOrden| ENG
 
-    ENG -->|3. Goroutine gRPC NotificarMatch| NOT
-    NOT -->|Notifica Oferente y Demandante| ART
+    ENG -->|NotificarMatch| NOT
+    NOT --> ART
 
-    %% Telemetría Prometheus
-    NOT -.->|Metrics :2112| PROM
-    VAL -.->|Metrics :2113| PROM
+    %% Telemetria Prometheus
+    NOT -.-> PROM
+    VAL -.-> PROM
 ```
 
 ---
