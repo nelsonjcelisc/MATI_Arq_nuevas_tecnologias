@@ -13,6 +13,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 type OrdenDTO struct {
@@ -63,8 +64,33 @@ func handleOrden(w http.ResponseWriter, r *http.Request) {
 		FirmaDigital: dto.FirmaDigital,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	// Extraer encabezados de tracing de la petición HTTP entrante para Istio (W3C / B3)
+	tracingHeaders := []string{
+		"x-request-id",
+		"x-b3-traceid",
+		"x-b3-spanid",
+		"x-b3-parentspanid",
+		"x-b3-sampled",
+		"x-b3-flags",
+		"traceparent",
+		"tracestate",
+	}
+	grpcMD := make(map[string]string)
+	for _, h := range tracingHeaders {
+		if val := r.Header.Get(h); val != "" {
+			grpcMD[h] = val
+		}
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
+	if len(grpcMD) > 0 {
+		var pairs []string
+		for k, v := range grpcMD {
+			pairs = append(pairs, k, v)
+		}
+		ctx = metadata.AppendToOutgoingContext(ctx, pairs...)
+	}
 
 	// 1. PASO ZERO-TRUST: Validación de Contrato en Caliente (Docker separado)
 	if validatorClient != nil {

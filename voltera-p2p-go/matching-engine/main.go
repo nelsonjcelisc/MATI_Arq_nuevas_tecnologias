@@ -67,7 +67,7 @@ func (s *server) CrearOrden(ctx context.Context, in *pb.OrdenEnergyRequest) (*pb
 					d.Kwh -= kwhTransados
 				}
 
-				go notificarMatch(matchedID, in.OrdenId, d.OrdenId, in.ProsumidorId, d.ProsumidorId, kwhTransados, precioFinal, in.TsRecepcion)
+				go notificarMatch(ctx, matchedID, in.OrdenId, d.OrdenId, in.ProsumidorId, d.ProsumidorId, kwhTransados, precioFinal, in.TsRecepcion)
 				break
 			}
 		}
@@ -91,7 +91,7 @@ func (s *server) CrearOrden(ctx context.Context, in *pb.OrdenEnergyRequest) (*pb
 					o.Kwh -= kwhTransados
 				}
 
-				go notificarMatch(matchedID, o.OrdenId, in.OrdenId, o.ProsumidorId, in.ProsumidorId, kwhTransados, precioFinal, in.TsRecepcion)
+				go notificarMatch(ctx, matchedID, o.OrdenId, in.OrdenId, o.ProsumidorId, in.ProsumidorId, kwhTransados, precioFinal, in.TsRecepcion)
 				break
 			}
 		}
@@ -119,7 +119,7 @@ func min(a, b float64) float64 {
 	return b
 }
 
-func notificarMatch(matchID, ofertaID, demandaID, oferenteID, demandanteID string, kwh, precio float64, tsApiRecepcion int64) {
+func notificarMatch(incomingCtx context.Context, matchID, ofertaID, demandaID, oferenteID, demandanteID string, kwh, precio float64, tsApiRecepcion int64) {
 	if notifClient == nil {
 		return
 	}
@@ -139,7 +139,8 @@ func notificarMatch(matchID, ofertaID, demandaID, oferenteID, demandanteID strin
 		TsApiSalida:            tsApiSalida,
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	// Inyectar metadatos entrantes (x-request-id, traceparent, etc) en el contexto de la llamada gRPC saliente
+	ctx, cancel := context.WithTimeout(incomingCtx, 2*time.Second)
 	defer cancel()
 
 	_, err := notifClient.EnviarNotificacion(ctx, req)
